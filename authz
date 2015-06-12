@@ -1,0 +1,25 @@
+### This file is an example authorization file for svnserve.
+### Its format is identical to that of mod_authz_svn authorization
+### files.
+### As shown below each section defines authorizations for the path and
+### (optional) repository specified by the section name.
+### The authorizations follow. An authorization line can refer to:
+
+[aliases]
+james = luzhang
+joe = joe2
+
+[groups]
+harry_and_sally = harry,sally
+harry_sally_and_joe = harry,joe2,sally
+
+[/] = r
+@harry_and_sally = r
+#@harry_and_sally = rw
+#harry = r
+
+[/foo/bar]
+@harry_and_sally = rw
+harry = r
+&joe = r
+#* =
