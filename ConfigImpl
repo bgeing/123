@@ -1,0 +1,672 @@
+package service;
+
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+
+public class ConfigImpl implements Config {
+
+	private HashMap<String, Group> groups;
+	private HashMap<String, path> paths;
+	private HashMap<String, String> aliases;
+	private ArrayList<String> newAlias;
+	private HashMap<String, ArrayList<String>> newGroup;
+	private String newPath;
+	//?new added group
+	private ArrayList<String> newGroupAccess;
+
+	public ConfigImpl() {
+		this.groups = new HashMap<String, Group>();
+		this.paths = new HashMap<String, path>();
+		this.aliases = new HashMap<String, String>();
+		this.newAlias = new ArrayList<String>();
+		this.newGroup = new HashMap<String, ArrayList<String>>();
+		this.newPath = new String();
+		this.newGroupAccess = new ArrayList<String>();
+	}
+
+	@Override
+	public Config load(File file) {
+		path tempPath = null;
+		String status = "";
+		BufferedReader br;
+		try {
+			br = new BufferedReader(new FileReader(file));
+			String data = br.readLine();
+			while (data != null) {
+				System.out.println(data);
+
+				if (data.length() != 0 && !isComment(data)) {
+					// Title(Groups,Path,Aliases,Comment)
+					if (isDefination(data)) {
+						if (isPath(data)) {
+							String pathName = getPathName(data);
+							path path = parsePath(data);
+							paths.put(pathName, path);
+							tempPath = path;
+							status = "path";
+						} else if (isGroupSign(data)) {
+							status = "groups";
+						} else if (isAliasSign(data)) {
+							status = "alias";
+						}
+					}
+					// Content(content under the title)
+					else {
+						if (status == "groups") {
+							Group group = saveGroup(data);
+						} else if (status == "alias") {
+							String[] strArr = parseAliases(data);
+							String alias = strArr[0];
+							String origin = strArr[1];
+							addToAliases(alias, origin);
+						} else if (status == "path") {
+							if (data.charAt(0) == '@') {
+								setGroupAccess(tempPath, data);
+							} else if (data.charAt(0) == '*') {
+								setAllUserAccess(tempPath, data);
+							} else if (data.charAt(0) == '&') {
+								setAliasUserAccess(tempPath, data);
+							} else {
+								setUserAccess(tempPath, data);
+							}
+						}
+					}
+
+				}
+				data = br.readLine();
+
+			}
+			br.close();
+
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+		return null;
+	}
+
+	@Override
+	public void save(File file) {
+		String title = null;
+		String status = "";
+		String pathReaded = null;
+		String tempData = null;
+		try {
+			if (!file.exists()) {
+				file.createNewFile();
+			}
+			File backUpFile = new File("C:\\dev\\Workspace\\subversion\\authz2");
+			FileWriter fw = new FileWriter(backUpFile);
+			BufferedWriter bw = new BufferedWriter(fw);
+			BufferedReader br = new BufferedReader(new FileReader(file));
+			String data = br.readLine();
+			while (data != null) {
+				if (data.length() == 0) {
+
+					System.out.println("");
+					bw.write("");
+					bw.write("\n");
+				} else if (isComment(data)) {
+
+					System.out.println(data);
+					bw.write(data);
+					bw.write("\n");
+				} else {
+					// Title(Groups,Path,Aliases,Comment)
+					if (isDefination(data)) {
+						if (isAliasSign(data)) {
+							status = "alias";
+							System.out.println(data);
+							bw.write(data);
+							bw.write("\n");
+						} else if (isGroupSign(data)) {
+							status = "groups";
+							System.out.println(data);
+							System.out.println("\n");
+							bw.write(data);
+							bw.write("\n");
+						} else if (isPath(data)) {
+							if (newPath != null) {
+								title = newPath;
+								System.out.println("[" + newPath + "]");
+								System.out.println("");
+								bw.write("[" + newPath + "]");
+								bw.write("\n");
+								pathReaded = newPath;
+								tempData = data;
+								if(!newGroupAccess.isEmpty()){
+									String groupStr = newGroupAccess.get(0);
+									data = "@"+groupStr;
+								} else{
+									data = "["+newPath+"]";
+								}
+								status="path";
+								newPath=null;
+								continue;
+
+							} else {
+								String pathName = getPathName(data);
+								title = pathName;
+								System.out.println(data);
+								status = "path";
+								bw.write(data);
+								bw.write("\n");
+							}
+						}
+					}
+					// Content(content under the title)
+					else {
+						StringBuilder sb = new StringBuilder();
+						if (status == "groups") {
+							if (!newGroup.isEmpty()) {
+								Iterator<?> iter = newGroup.entrySet()
+										.iterator();
+								if (iter.hasNext()) {
+									Map.Entry entry = (Map.Entry) iter.next();
+									String groupName = (String) entry.getKey();
+									groupName = groupName.trim();
+									Group group = new Group(groupName);
+									sb.append(groupName + " = ");
+									ArrayList<String> users = (ArrayList<String>) entry.getValue();
+									for (int i = 0; i < users.size() - 1; i++) {
+										String user = users.get(i);
+										group.addToGroup(user);
+										sb.append(user + ",");
+									}
+									sb.append(users.get(users.size() - 1));
+									bw.write(sb.toString());
+									bw.write("\n");
+									this.groups.put(groupName, group);
+									newGroup.remove(groupName);
+									continue;
+								}
+							} else {
+								String groupName = parseGroupName(data);
+								sb.append(groupName + " = ");
+								Group group = getGroup(groupName);
+								HashMap<String, user> users = group.getUsers();
+								Iterator<user> iter = users.values().iterator();
+								while (iter.hasNext()) {
+									user user = iter.next();
+									sb.append(user.getUsername());
+									if (iter.hasNext()) {
+										sb.append(",");
+									}
+								}
+								String groupDetail = sb.toString();
+								System.out.println(groupDetail);
+								bw.write(groupDetail);
+								bw.write("\n");
+							}
+						} else if (status == "alias") {
+							if (newAlias.size() != 0) {
+								String alias = newAlias.get(0);
+								String origin = newAlias.get(1);
+								aliases.put(alias, origin);
+								bw.write(alias + " = " + origin);
+								bw.write("\n");
+								// newAlias.clear();
+								newAlias.remove(1);
+								newAlias.remove(0);
+								continue;
+							} else {
+								String[] strArr = parseAliases(data);
+								String alias = strArr[0];
+								String origin = aliases.get(alias);
+								System.out.println(alias + " = " + origin);
+								bw.write(alias + " = " + origin);
+								bw.write("\n");
+							}
+
+						} else if (status == "path") {
+							if(pathReaded!=null){
+								path path = paths.get(pathReaded);
+								if(!this.newGroupAccess.isEmpty()){
+									 HashMap<String, ArrayList<Boolean>> accesses = path.getGroupsAccess();
+									 ArrayList<Boolean>accessList = accesses.get(newGroupAccess.get(0));
+									 String accessStr = getAccessStr(accessList);	 
+									 System.out.println("@"+ newGroupAccess.get(0)+" = "+accessStr);
+									 bw.write("@"+ newGroupAccess.get(0)+" = "+accessStr);
+									 bw.write("\n");
+									 bw.write("\n");
+									 newGroupAccess.clear();
+									 pathReaded=null;
+									 data = tempData;
+									 continue;
+								}
+							}
+							if (data.charAt(0) == '@') {
+								//judge whether groupName really appear in the file
+								String groupName = parseGroupName(data);
+								path path = paths.get(title);
+								HashMap<String, ArrayList<Boolean>> groupAccess = path
+										.getGroupsAccess();
+								if (groupAccess.containsKey(groupName)) {
+									ArrayList<Boolean> accesses = groupAccess
+											.get(groupName);
+									String access = getAccessStr(accesses);
+									System.out.println("@" + groupName + " = "
+											+ access);
+									bw.write("@" + groupName + " = " + access);
+									bw.write("\n");
+								}
+
+							} else if (data.charAt(0) == '*') {
+								// UI not provide *
+								System.out.println(data);
+								bw.write(data);
+								bw.write("\n");
+
+							} else if (data.charAt(0) == '&') {
+								String[] strArr = data.split("=");
+								String temp = strArr[0].trim();
+								String alias = temp.substring(1, temp.length());
+								String origin = aliases.get(alias);
+								path path = paths.get(title);
+								HashMap<String, ArrayList<Boolean>> userAccess = path
+										.getUserAccess();
+								if (userAccess.containsKey(origin)) {
+									ArrayList<Boolean> accesses = userAccess
+											.get(origin);
+									String access = getAccessStr(accesses);
+									System.out.println("&" + alias + " = "
+											+ access);
+									bw.write("&" + alias + " = " + access);
+									bw.write("\n");
+								}
+							} else {
+								String[] strArr = data.split("=");
+								String userName = strArr[0].trim();
+								path path = paths.get(title);
+								HashMap<String, ArrayList<Boolean>> userAccess = path
+										.getUserAccess();
+								if (userAccess.containsKey(userName)) {
+									ArrayList<Boolean> accesses = userAccess
+											.get(userName);
+									String access = getAccessStr(accesses);
+									System.out.println(userName + " = "
+											+ access);
+									bw.write(userName + " = " + access);
+									bw.write("\n");
+								}
+							}
+						}
+					}
+
+				}
+				data = br.readLine();
+			}
+			
+			br.close();
+			bw.flush();
+			bw.close();
+			String fileName = file.getName();
+			if (file.exists()) {
+				file.delete();
+			}
+			if(backUpFile.exists()){
+				backUpFile.renameTo(new File(fileName));
+			}
+			
+		} catch (FileNotFoundException e) {
+			e.printStackTrace();
+		} catch (IOException e) {
+			e.printStackTrace();
+		}
+
+	}
+
+	@Override
+	public void addGroup(String groupName, ArrayList<String> users) {
+		if (!newGroup.containsKey(groupName)) {
+			newGroup.put(groupName, users);
+		}
+
+	}
+
+	public void deleteGroup(String groupName) {
+		if (groups.containsKey(groupName)) {
+			groups.remove(groupName);
+		}
+	}
+
+	@Override
+	public List<String> getGroups() {
+		List<String> groupsName = new ArrayList<String>();
+		Iterator<String> iter = groups.keySet().iterator();
+		while (iter.hasNext()) {
+			String groupName = iter.next();
+			groupsName.add(groupName);
+		}
+		return groupsName;
+	}
+
+	@Override
+	public void addPath(String pathName) {
+		if (!this.paths.containsKey(pathName)) {
+			newPath = pathName;
+		}
+
+	}
+
+	public void removePath(String pathName) {
+		if (paths.containsKey(pathName)) {
+			paths.remove(pathName);
+		}
+	}
+
+	@Override
+	public void setGroupPermission(String groupName, String pathName,
+			boolean read, boolean write) {
+
+		if (paths.containsKey(pathName)) {
+			path path = paths.get(pathName);
+			HashMap<String, ArrayList<Boolean>> groupsAccess = path
+					.getGroupsAccess();
+			ArrayList<Boolean> accesses = groupsAccess.get(groupName);
+			accesses.set(0, read);
+			accesses.set(1, write);
+
+		}
+
+	}
+
+	@Override
+	public void setUserPermission(String userName, String pathName,
+			boolean read, boolean write) {
+
+		if (paths.containsKey(pathName)) {
+			path path = paths.get(pathName);
+			HashMap<String, ArrayList<Boolean>> userAccess = path
+					.getUserAccess();
+			ArrayList<Boolean> accesses = userAccess.get(userName);
+			accesses.set(0, read);
+			accesses.set(1, write);
+		}
+	}
+
+	public boolean isComment(String str) {
+		if (str.charAt(0) == '#')
+			return true;
+		else
+			return false;
+	}
+
+	public boolean isDefination(String str) {
+		if (str.charAt(0) == '[')
+			return true;
+		else
+			return false;
+	}
+
+	public boolean isPath(String str) {
+		if (str.charAt(1) == '/')
+			return true;
+		else
+			return false;
+	}
+
+	public String getPathName(String str) {
+		return str.substring(1, str.length() - 1).trim();
+	}
+
+	public path parsePath(String str) {
+		if (str.length() > 1) {
+			String tempPath = str.substring(1, str.length() - 1).trim();
+			path path = new path(tempPath);
+			return path;
+		} else {
+			// return what?
+			return null;
+		}
+
+	}
+
+	public boolean isGroupSign(String str) {
+		if (str.substring(1, str.length() - 1).equals("groups")) {
+			return true;
+		} else
+			return false;
+	}
+
+	public boolean isAliasSign(String str) {
+		if (str.substring(1, str.length() - 1).equals("aliases"))
+			return true;
+		else
+			return false;
+	}
+
+	public String[] parseAliases(String str) {
+		String[] strArr = str.split("=");
+		strArr[0] = strArr[0].trim();
+		strArr[1] = strArr[1].trim();
+		return strArr;
+
+	}
+
+	public void addToAliases(String alias, String origin) {
+		aliases.put(alias, origin);
+	}
+
+	public Group saveGroup(String str) {
+		String[] strArr = str.split("=");
+		String groupName = strArr[0].trim();
+		String[] users = strArr[1].split(",");
+		Group group = new Group(groupName);
+		// put users into a group
+		for (String userName : users) {
+			group.addToGroup(checkAliases(userName.trim()));
+
+		}
+		// put a group into groups
+		groups.put(groupName, group);
+		return group;
+
+	}
+
+	public void setGroupAccess(path tempPath, String str) {
+		String temp = str.substring(1, str.length());
+		String[] strArr = temp.split("=");
+		String groupName = strArr[0].trim();
+		String access = strArr[1].trim();
+		HashMap<String, ArrayList<Boolean>> groupAccess = tempPath
+				.getGroupsAccess();
+		ArrayList<Boolean> accesses = checkAccess(access);
+		groupAccess.put(groupName, accesses);
+		tempPath.setGroupsAccess(groupAccess);
+		paths.put(tempPath.getPath(), tempPath);
+	}
+
+	public void setAliasUserAccess(path tempPath, String str) {
+		str = str.trim();
+		str = str.substring(1, str.length());
+		String[] aliasStr = str.split("=");
+		String origin = aliases.get(aliasStr[0].trim());
+		setUserAccess(tempPath, origin + "=" + aliasStr[1]);
+
+	}
+
+	public void setUserAccess(path tempPath, String str) {
+		String[] strArr = str.split("=");
+		String userName = strArr[0].trim();
+		String access = strArr[1].trim();
+		ArrayList<Boolean> accesses = setAccessStr(access);
+		tempPath.getUserAccess().put(userName, accesses);
+
+	}
+
+	public void setAllUserAccess(path tempPath, String str) {
+		String[] strArr = str.split("=");
+		if (strArr.length < 2) {
+			ArrayList<Boolean> accesses = new ArrayList<Boolean>();
+			accesses.add(false);
+			accesses.add(false);
+			HashMap<String, ArrayList<Boolean>> userAccess = new HashMap<String, ArrayList<Boolean>>();
+			Iterator<?> iter = tempPath.getUserAccess().entrySet().iterator();
+			while (iter.hasNext()) {
+				Map.Entry entry = (Map.Entry) iter.next();
+				String userName = (String) entry.getKey();
+				userAccess.put(userName, accesses);
+			}
+			tempPath.setUserAccess(userAccess);
+
+		} else {
+			String access = strArr[1].trim();
+			ArrayList<Boolean> accesses = checkAccess(access);
+			HashMap<String, ArrayList<Boolean>> userAccess = new HashMap<String, ArrayList<Boolean>>();
+			Iterator<?> iter = tempPath.getUserAccess().entrySet().iterator();
+			while (iter.hasNext()) {
+				Map.Entry entry = (Map.Entry) iter.next();
+				String userName = (String) entry.getKey();
+				userAccess.put(userName, accesses);
+			}
+			tempPath.setUserAccess(userAccess);
+		}
+	}
+
+	public String checkAliases(String userName) {
+		if (userName.charAt(0) == '&') {
+			String alias = userName.substring(1, userName.length());
+			if (aliases.containsKey(alias)) {
+				return this.aliases.get(alias);
+			} else
+				return null;
+		} else
+			return userName;
+	}
+
+	public ArrayList<Boolean> checkAccess(String access) {
+		ArrayList<Boolean> accessList = new ArrayList<Boolean>();
+		Boolean read = null;
+		Boolean write = null;
+		if (access == null) {
+			read = false;
+			write = false;
+		} else if (access.equals("r")) {
+			read = true;
+			write = false;
+		} else if (access.equals("rw")) {
+			read = true;
+			write = true;
+		}
+		accessList.add(read);
+		accessList.add(write);
+		return accessList;
+	}
+
+	public void addAlias(String alias, String origin) {
+		newAlias.add(alias);
+		newAlias.add(origin);
+	}
+
+	public void updateAlias(String alias, String origin) {
+		aliases.put(alias, origin);
+
+	}
+
+	public void removeAlias(String alias) {
+		if (aliases.containsKey(alias)) {
+			aliases.remove(alias);
+		}
+	}
+
+	public void addUserToGroup(String userName, String groupName) {
+		Group group = groups.get(groupName);
+		group.addToGroup(userName);
+
+	}
+
+	public void deleteUserFromGroup(String userName, String groupName) {
+		Group group = groups.get(groupName);
+		group.removeFromGroup(userName);
+	}
+
+	public String parseGroupName(String str) {
+		String temp = str.split("=")[0].trim();
+		if (temp.charAt(0) != '@')
+			return temp;
+		else {
+			return temp.substring(1, temp.length());
+		}
+	}
+
+	public Group getGroup(String groupName) {
+		Group group = groups.get(groupName);
+		return group;
+	}
+
+	public ArrayList<Boolean> setAccessStr(String str) {
+		ArrayList<Boolean> access = new ArrayList<Boolean>();
+		if (str.length() == 0) {
+			access.add(false);
+			access.add(false);
+			return access;
+		} else if (str.equals("rw")) {
+			access.add(true);
+			access.add(true);
+			return access;
+		} else if (str.equals("r")) {
+			access.add(true);
+			access.add(false);
+			return access;
+		} else {
+			access.add(false);
+			access.add(true);
+			return access;
+		}
+	}
+
+	public String getAccessStr(ArrayList<Boolean> access) {
+		boolean read = access.get(0);
+		boolean write = access.get(1);
+		if (read && write) {
+			return new String("rw");
+		} else if (read && !write) {
+			return new String("r");
+		} else if (!read && write) {
+			return new String("w");
+		} else {
+			return new String("");
+		}
+	}
+	
+	public void addGroupAccess(String pathName,String groupAccessStr){
+		//put new path into paths, put groupAccess into relative path
+		path path = new path(pathName);
+		String groupName = parseGroupName(groupAccessStr);
+		String[] accessStr = groupAccessStr.split("=");
+		String access = null;
+		if(accessStr.length==2){
+			access = accessStr[1].trim();
+		}
+		else{
+			access = "";
+		}
+		ArrayList<Boolean> accesses = setAccessStr(access);
+		this.paths.put(pathName, path);
+		HashMap<String,ArrayList<Boolean>>groupAccess = path.getGroupsAccess();
+		groupAccess.put(groupName, accesses);
+		//put this group into newAdded group under certain path.
+		this.newGroupAccess.add(groupName);
+		
+	}
+	
+	public HashMap<String, String> getAliases() {
+		return aliases;
+	}
+
+	public void setAliases(HashMap<String, String> aliases) {
+		this.aliases = aliases;
+	}
+}
