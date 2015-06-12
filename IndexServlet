@@ -1,0 +1,48 @@
+package servlet;
+
+import java.io.File;
+import java.io.IOException;
+import java.util.HashMap;
+import java.util.Map;
+
+import javax.servlet.RequestDispatcher;
+import javax.servlet.ServletException;
+import javax.servlet.http.HttpServlet;
+import javax.servlet.http.HttpServletRequest;
+import javax.servlet.http.HttpServletResponse;
+
+import service.ConfigImpl;
+
+public class IndexServlet extends HttpServlet{
+
+	public void doGet(HttpServletRequest request,HttpServletResponse response) throws 
+	IOException,ServletException{
+		
+			ConfigImpl configuration = new ConfigImpl();
+			File file = new File("C:\\dev\\Workspace\\subversion\\authz");
+			configuration.load(file);
+			HashMap<String,String> aliases = configuration.getAliases();
+			
+			Map<String,String> test = new HashMap<String,String>();
+			test.put("what", "team");
+			test.put("CAV", "GS");
+			
+			Map mapValue = new HashMap();
+			 mapValue.put("key1", "value1");
+			 mapValue.put("key2", "value2");
+			 
+			request.setAttribute("teams", test);
+			
+			request.setAttribute("aliases", aliases);
+			
+			RequestDispatcher rd = request.getRequestDispatcher("alias-manage.jsp");
+			rd.forward(request,response);
+	}
+	
+	
+	public void doPost(HttpServletRequest request,HttpServletResponse response) throws 
+	IOException,ServletException{
+		doGet(request,response);
+	}
+	
+}
