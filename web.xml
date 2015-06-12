@@ -1,0 +1,61 @@
+Enter file contents here<?xml version="1.0" encoding="ISO-8859-1"?>
+
+<!DOCTYPE web-app 
+    PUBLIC "-//Sun Microsystems, Inc.//DTD Web Application 2.3//EN" 
+    "http://java.sun.com/dtd/web-app_2_3.dtd">
+
+<web-app>
+	
+	<servlet>
+		<servlet-name>index</servlet-name>
+		<servlet-class>servlet.IndexServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>addNewAlias</servlet-name>
+		<servlet-class>servlet.AddNewAliasServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>saveAlias</servlet-name>
+		<servlet-class>servlet.SaveAliasServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>addNewGroup</servlet-name>
+		<servlet-class>servlet.AddNewGroupServlet</servlet-class>
+	</servlet>
+	
+	<servlet>
+		<servlet-name>saveNewGroup</servlet-name>
+		<servlet-class>servlet.SaveNewGroupServlet</servlet-class>
+	</servlet>
+	
+	
+	<servlet-mapping>
+		<servlet-name>addNewAlias</servlet-name>
+		<url-pattern>/add-alias</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>saveAlias</servlet-name>
+		<url-pattern>/save-alias</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>addNewGroup</servlet-name>
+		<url-pattern>/add-group</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>saveNewGroup</servlet-name>
+		<url-pattern>/save-group</url-pattern>
+	</servlet-mapping>
+	
+	<servlet-mapping>
+		<servlet-name>index</servlet-name>
+		<url-pattern>/index</url-pattern>
+	</servlet-mapping>
+	
+
+</web-app>
